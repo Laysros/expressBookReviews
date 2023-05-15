@@ -1,38 +1,175 @@
 const express = require('express');
-const jwt = require('jsonwebtoken');
-const session = require('express-session')
-const customer_routes = require('./router/auth_users.js').authenticated;
-const genl_routes = require('./router/general.js').general;
+let books = require("./booksdb.js");
+let isValid = require("./auth_users.js").isValid;
+let users = require("./auth_users.js").users;
+const public_users = express.Router();
 
-const app = express();
 
-app.use(express.json());
-
-app.use("/customer", session({ secret: "fingerprint_customer", resave: true, saveUninitialized: true }))
-
-app.use("/customer/auth/*", function auth(req, res, next) {
-    if (req.session.authorization) {
-        token = req.session.authorization['accessToken'];
-        jwt.verify(
-            token,
-            "access",
-            (err, user) => {
-                if (err) {
-                    res.status(401).json({ message: "Not authenticated" });
-                } else {
-                    req.user = user;
-                    next();
-                }
-            }
-        )
-    } else {
-        res.status(401).json({ message: "Not authenticated" });
+public_users.post("/register", (req, res) => {
+  //Write your code here
+  username = req.body.username
+  password = req.body.password
+  if (username && password) {
+    if (isValid(username)) {
+      users.push({
+        username: username,
+        password: password
+      })
+      return res.status(200).send("User successfully registered.");
     }
+    return res.status(400).send("Username already exists.");
+  }
+  return res.status(400).send("Username and password are required.");
 });
 
-const PORT = 5000;
+// Get the book list available in the shop
+public_users.get('/', function (req, res) {
+  //Write your code here
+  return res.status(300).json({
+    books: JSON.stringify(
+      Object.keys(books).map((isbn) => {
+        return {
+          isbn: isbn,
+          book: books[isbn],
+        };
+      })
+    )
+  });
+});
 
-app.use("/customer", customer_routes);
-app.use("/", genl_routes);
+// Get book details based on ISBN
+public_users.get('/isbn/:isbn', function (req, res) {
+  //Write your code here
+  return res.status(300).json({
+    book: books[req.params.isbn]
+  });
+});
 
-app.listen(PORT, () => console.log("Server is running"));
+// Get book details based on author
+public_users.get('/author/:author', function (req, res) {
+  //Write your code here
+  let book_list = [];
+  for (let i = 1; i <= Object.keys(books).length; i++) {
+    if (books[i].author == req.params.author) {
+      book_list.push(books[i])
+    }
+  }
+  return res.status(300).json({
+    book_list
+  });
+});
+
+// Get all books based on title
+public_users.get('/title/:title', function (req, res) {
+  //Write your code here
+  let book_list = [];
+  for (let i = 1; i <= Object.keys(books).length; i++) {
+    if (books[i].title == req.params.title) {
+      book_list.push(books[i])
+    }
+  }
+  return res.status(300).json({
+    book_list
+  });
+});
+
+//  Get book review
+public_users.get('/review/:isbn', function (req, res) {
+  //Write your code here
+  return res.status(300).json({
+    reviews: books[req.params.isbn].reviews
+  });
+});
+
+
+// task 10
+function getAllBooks() {
+  return new Promise(
+    (resolve, reject) => {
+      resolve(Object.keys(books).map((isbn) => {
+        return {
+          isbn: isbn,
+          book: books[isbn],
+        };
+      }));
+    }
+  )
+}
+
+public_users.get('/', function (req, res) {
+  //Write your code here
+  getAllBooks().then((book_list) => {
+    return res.status(300).json({
+      book_list
+    });
+  })
+});
+
+// task 11
+function getBookByISBN(isbn) {
+  return new Promise(
+    (resolve, reject) => {
+      resolve(books[isbn]);
+    }
+  )
+}
+
+public_users.get('/isbn/:isbn', function (req, res) {
+  //Write your code here
+  getBookByISBN(req.params.isbn).then((book) => {
+    return res.status(300).json({
+      book
+    });
+  })
+});
+
+// task 12
+function getBookByAuthor(author) {
+  return new Promise(
+    (resolve, reject) => {
+      let book_list = [];
+      for (let i = 1; i <= Object.keys(books).length; i++) {
+        if (books[i].author == author) {
+          book_list.push(books[i])
+        }
+      }
+      resolve(book_list);
+    }
+
+  )
+}
+
+public_users.get('/author/:author', function (req, res) {
+  //Write your code here
+  getBookByAuthor(req.params.author).then((book_list) => {
+    return res.status(300).json({
+      book_list
+    });
+  })
+});
+
+// task 13
+function getBookByTitle(title) {
+  return new Promise(
+    (resolve, reject) => {
+      let book_list = [];
+      for (let i = 1; i <= Object.keys(books).length; i++) {
+        if (books[i].title == title) {
+          book_list.push(books[i])
+        }
+      }
+      resolve(book_list);
+    }
+  )
+}
+
+public_users.get('/title/:title', function (req, res) {
+  //Write your code here
+  getBookByTitle(req.params.title).then((book_list) => {
+    return res.status(300).json({
+      book_list
+    });
+  })
+});
+
+module.exports.general = public_users;
